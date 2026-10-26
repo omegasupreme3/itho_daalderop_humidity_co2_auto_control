@@ -25,6 +25,7 @@ Details:
 - By default the automatic night mode has 10% _(configurable)_ higher ventilation demand than the normal automatic mode
 - In case a CO2 sensor fails for 5 minutes or longer _(configurable)_, ventilation demand will go to 50% _(configurable)_
 - When nobody is at home, and thus less CO2 is produced, automatic mode will eventually have reduced ventilation demand as low as is configured on your heat exchanger
+- Depending on for example the CO2 production you might hear fan speeds going up and down throughout the day. For CO2 this will go smooth/stepless, but you can affect this by the configuration of how fast increase/decrease of ventilation demand should happen. For humidity however it will immediately go to 100% ventilation demand as soon as the threshold has been crossed
 
 ## My setup
 I've been using this at home for some time now without any problems. My setup is:
