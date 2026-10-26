@@ -35,7 +35,6 @@ I've been using this at home for some time now without any problems. My setup is
 
 
 # Assumptions
-This automation lets Home Assistant take control over handling ventilation demand instead of your Itho Daalderop heat exchanged based on configured CO2 and humidity sensors.
 - It uses the WiFi add-on (https://github.com/arjenhiemstra/ithowifi). It assumes the add-on was properly setup, connected to and configured in Home Assistant (use the official integration IthoWiFi via HACS)
 - The automation can use sensors and remotes from different manufacturers as long as they are properly configured and working in Home Assistant
 
