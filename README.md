@@ -1,5 +1,5 @@
 # itho_daalderop_humidity_co2_auto_control
-Let Home Assistant automatically control ventilation demand on your Itho Daalderop heat exchanger based on CO2/humidity sensors. It bypasses the built-in handling of the ventilation demand on the heat exchanger.
+Let Home Assistant automatically control ventilation demand on your Itho Daalderop heat exchanger based on CO2/humidity sensors. It bypasses the built-in handling of the ventilation demand on the heat exchanger, which responds much slower to changes especially in CO2. It also has a much higher threshold for CO2 (ppm) before it actually start responding by increasing ventilation demand. With this automation this can be completely customized to your personal preference.
 
 > [!IMPORTANT]
 > The automation was generated using ChatGPT in multiple stages. **I did not review any of it**. Use the script 'as is' as I don't take any responsibility for it. You are on your own here. If you come across bugs or have feature requests, you can create an issue. However I don't do any support. So I might or might not look at it at all ...
@@ -38,6 +38,7 @@ I've been using this at home for some time now without any problems. My setup is
 
 # Assumptions
 - It uses the WiFi add-on (https://github.com/arjenhiemstra/ithowifi). It assumes the add-on was properly setup, connected to and configured in Home Assistant (use the official integration IthoWiFi via HACS)
+- The automation assumes the WiFi add-on is at least on firmware version 3.14
 - MQTT is configured and operational on the WiFi add-on. The _MQTT base topic_ must be _ithohru_. If you have a different value, update the corresponding variable in the automation as well
 - The automation can use sensors and remotes from different manufacturers as long as they are properly configured and working in Home Assistant
 
@@ -46,7 +47,7 @@ I've been using this at home for some time now without any problems. My setup is
 
 
 # Quit setup
-Below is a quick configuration for the WiFi add-on just to make the automation work. You should follow the official setup guides prior to that. The automation assumes the WiFi add-on is at least on firmware version 3.14.
+Below is a quick configuration for the WiFi add-on just to make the automation work. You should follow the official setup guides prior to that.
 1. In _System settings_ set the following (leave everything else on default):
    - _Virtual remote settings_ -> _Map API key "command" to virtual remote 0_ == on
    - _Enable/Disable I2C commands_ -> _Ventilation status (31DA)_ == on
