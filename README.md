@@ -68,6 +68,7 @@ Below is a quick configuration for the WiFi add-on just to make the automation w
    - Set _Remote model_ to _RFT CO2_
    - Press _Update_
    - Power cycle the heat exchanger following the official guide. When in pairing mode, press _Join_ for this remote
+   - Press _Auto_ for this remote
 
 # Installation
 1. Use the File Editor in Home Assistant
