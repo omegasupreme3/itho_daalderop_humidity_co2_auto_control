@@ -11,7 +11,7 @@ Let Home Assistant automatically control ventilation demand on your Itho Daalder
 # General
 The automation can be configured with:
 - various thresholds
-- how fast increase/decrease of ventilation demand should happen
+- how fast increase/decrease of ventilation demand should happen. This goes stepless. By default increase goes faster than decrease, but this can be configured
 - etc.
 
 It also uses priorities in respective order high to low:
