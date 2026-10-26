@@ -24,6 +24,7 @@ Details:
 - The timers (10/20/30) will revert to the automatic mode (or automatic night mode if that was previously active)
 - By default the automatic night mode has 10% _(configurable)_ higher ventilation demand than the normal automatic mode
 - In case a CO2 sensor fails for 5 minutes or longer _(configurable)_, ventilation demand will go to 50% _(configurable)_
+- When nobody is at home, and thus less CO2 is produced, automatic mode will eventually have reduced ventilation demand as low as is configured on your heat exchanger
 
 ## My setup
 I've been using this at home for some time now without any problems. My setup is:
