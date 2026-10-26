@@ -55,7 +55,7 @@ Below is a quick configuration for the WiFi add-on just to make the automation w
    - _Autodetect CC1101 RF module_ -> _Itho RF remote support_ == on
    - _RF CO2 control_ -> Control interface == RF CO2
 2. Clear all paired sensors/remotes on the heat exchanger. Follow the official guide of the heat exchanger and the remote. You only have to unpair ONE sensor/remote as that will clear all paired sensors/remotes on the heat exchanger
-3. In _RF devices_ configure the RF remotes (e.g. CO2/humidity sensors, Spider, physical remotes). This is only necessary if they are from Itho Daalderop:
+3. In _RF devices_ configure the RF remotes (e.g. CO2/humidity sensors, Spider, physical remotes). Note that this is only necessary if they are from Itho Daalderop. If you use sensors that are directly connected to Home Assistant, then you can skip this step.
    - Set the WiFi add-on in learn mode
    - Follow the official guide for your sensors/remotes to pair them with the WiFi add-on
    - CO2/humidity sensors should be configured with _Receive_ for _Remote function_. Select the appropriate _Remote model_
