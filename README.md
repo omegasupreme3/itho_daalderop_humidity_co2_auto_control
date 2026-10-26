@@ -1,14 +1,14 @@
 # itho_daalderop_humidity_co2_auto_control
-Let Home Assistant automatically control ventilation demand on your Itho Daalderop heat exchanger based on CO2/humidity sensors. It bypasses the built-in handling of the ventilation demand on the heat exchanger, which responds much slower to changes especially in CO2. It also has a much higher threshold for CO2 (ppm) before it actually start responding by increasing ventilation demand. With this automation this can be completely customized to your personal preference.
-
 > [!IMPORTANT]
-> The automation was generated using ChatGPT in multiple stages. **I did not review any of it**. Use the script 'as is' as I don't take any responsibility for it. You are on your own here. If you come across bugs or have feature requests, you can create an issue. However I don't do any support. So I might or might not look at it at all ...
+> **The automation was generated using ChatGPT** in multiple stages. **I did not review any of it!** Use the script 'as is' as I don't take any responsibility for it. You are on your own here. If you come across bugs or have feature requests, you can create an issue. However I don't do any support. So I might or might not look at it at all ...
+
+# General
+Let Home Assistant automatically control ventilation demand on your Itho Daalderop heat exchanger based on CO2/humidity sensors. It bypasses the built-in handling of the ventilation demand on the heat exchanger, which responds much slower to changes especially in CO2. It also has a much higher threshold for CO2 (ppm) before it actually start responding by increasing ventilation demand. With this automation this can be completely customized to your personal preference.
 
 > [!IMPORTANT]
 > The automation contains an extensive explanation of how it should be configured and how it works. You should read that.
 
-
-# General
+## Details
 The automation can be configured with:
 - various thresholds
 - how fast increase/decrease of ventilation demand should happen. This goes stepless. By default increase goes faster than decrease, but this can be configured
