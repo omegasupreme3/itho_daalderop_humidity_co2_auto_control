@@ -1,5 +1,5 @@
 # itho_daalderop_humidity_co2_auto_control
-Let Home Assistant automatically control your Itho Daalderop heat exchanger based on CO2/humidity sensors.
+Let Home Assistant automatically control ventilation demand on your Itho Daalderop heat exchanger based on CO2/humidity sensors. It bypasses the built-in handling of the ventilation demand on the heat exchanger.
 
 > [!IMPORTANT]
 > The automation was generated using ChatGPT in multiple stages. **I did not review any of it**. Use the script 'as is' as I don't take any responsibility for it. You are on your own here. If you come across bugs or have feature requests, you can create an issue. However I don't do any support. So I might or might not look at it at all ...
