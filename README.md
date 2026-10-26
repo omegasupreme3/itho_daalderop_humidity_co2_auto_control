@@ -43,7 +43,7 @@ I've been using this at home for some time now without any problems. My setup is
 - The automation can use sensors and remotes from different manufacturers as long as they are properly configured and working in Home Assistant
 
 > [!CAUTION]
-> If you do have sensors/remotes from Itho Daalderop, the automation assumes **all those sensors/remotes are joined with the WiFi add-on only**. This is because the automation takes over handling ventilation demand from the heat exchangers built-in handling. If a sensor/remote is still connected to the heat exchanger and changes the ventilation demand, **the automation will NOT be aware of that** and this may lead to unwanted behavior of the heat exchanger. All sensors/remotes include: CO2/humidity sensors, Spider, physical remotes to set timers/auto/low/med/high modes and so on. Recommended setup is to only have the virtual remote (see step 3 below) and CO2 RF device (see step 5 below) be paired with the heat exchanger.
+> If you do have sensors/remotes from Itho Daalderop, the automation assumes **all those sensors/remotes are joined with the WiFi add-on only**. This is because the automation takes over handling ventilation demand from the heat exchangers built-in handling. If a sensor/remote is still connected to the heat exchanger and changes the ventilation demand, **the automation will NOT be aware of that** and this may lead to unwanted behavior of the heat exchanger. All sensors/remotes include: CO2/humidity sensors, Spider, physical remotes to set timers/auto/low/med/high modes and so on. Recommended setup is to only have a CO2 RF device (see step 4 below) be paired with the heat exchanger.
 
 
 # Quit setup
@@ -55,16 +55,11 @@ Below is a quick configuration for the WiFi add-on just to make the automation w
    - _Autodetect CC1101 RF module_ -> _Itho RF remote support_ == on
    - _RF CO2 control_ -> Control interface == RF CO2
 2. Clear all paired sensors/remotes on the heat exchanger. Follow the official guide of the heat exchanger and the remote. You only have to unpair ONE sensor/remote as that will clear all paired sensors/remotes on the heat exchanger
-3. In _Virtual remotes_ configure a virtual remote:
-   - Set a unique ID
-   - The type must be _RFT AUTO_
-   - Press _Update_
-   - Power cycle the heat exchanger following the official guide. When in pairing mode, press _Join_ on the virtual remote
-4. In _RF devices_ configure the RF remotes (e.g. CO2/humidity sensors, Spider, physical remotes). This is only necessary if they are from Itho Daalderop:
+3. In _RF devices_ configure the RF remotes (e.g. CO2/humidity sensors, Spider, physical remotes). This is only necessary if they are from Itho Daalderop:
    - Set the WiFi add-on in learn mode
    - Follow the official guide for your sensors/remotes to pair them with the WiFi add-on
    - CO2/humidity sensors should be configured with _Receive_ for _Remote function_. Select the appropriate _Remote model_
-5. In _RF devices_ configure a CO2 sensor. This is the sensor that allows the automation to stepless change the ventilation demand on the heat exchanger:
+4. In _RF devices_ configure a CO2 sensor. This is the sensor that allows the automation to stepless change the ventilation demand on the heat exchanger:
    - Set _Remote function_ to _Send_
    - Set _Remote model_ to _RFT CO2_
    - Press _Update_
