@@ -36,10 +36,11 @@ I've been using this at home for some time now without any problems. My setup is
 
 # Assumptions
 - It uses the WiFi add-on (https://github.com/arjenhiemstra/ithowifi). It assumes the add-on was properly setup, connected to and configured in Home Assistant (use the official integration IthoWiFi via HACS)
+- MQTT is configured and operational on the WiFi add-on. The _MQTT base topic_ must be _ithohru_. If you have a different value, update the corresponding variable in the automation as well
 - The automation can use sensors and remotes from different manufacturers as long as they are properly configured and working in Home Assistant
 
 > [!CAUTION]
-> If you do have sensors/remotes from Itho Daalderop, the automation assumes **all those sensors/remotes are joined with the WiFi add-on only**. This is because the automation takes over handling ventilation demand from the heat exchangers built-in mode. If a sensor/remote is still connected to the heat exchanger and changes the ventilation demand, **the automation will not be aware of that** and this may lead to unwanted behavior of the heat exchanger. All sensors/remotes include: CO2/humidity sensors, Spider, physical remotes to set timers/auto/low/med/high modes and so on. Recommended setup is to only have the virtual remote (see step 3 below) and CO2 RF device (see step 5 below) be paired with the heat exchanger.
+> If you do have sensors/remotes from Itho Daalderop, the automation assumes **all those sensors/remotes are joined with the WiFi add-on only**. This is because the automation takes over handling ventilation demand from the heat exchangers built-in handling. If a sensor/remote is still connected to the heat exchanger and changes the ventilation demand, **the automation will NOT be aware of that** and this may lead to unwanted behavior of the heat exchanger. All sensors/remotes include: CO2/humidity sensors, Spider, physical remotes to set timers/auto/low/med/high modes and so on. Recommended setup is to only have the virtual remote (see step 3 below) and CO2 RF device (see step 5 below) be paired with the heat exchanger.
 
 
 # Quit setup
@@ -65,9 +66,6 @@ Below is a quick configuration for the WiFi add-on just to make the automation w
    - Set _Remote model_ to _RFT CO2_
    - Press _Update_
    - Power cycle the heat exchanger following the official guide. When in pairing mode, press _Join_ for this remote
-
-> [!NOTE]
-> MQTT **must** be configured and operational on the WiFi add-on. The _MQTT base topic_ must be _ithohru_. If you have a different value, update the corresponding variable in the automation as well.
 
 # Installation
 1. Use the File Editor in Home Assistant
