@@ -1,0 +1,645 @@
+# Itho CO2 + humidity control — version 1.10.0
+# Release date: 2026-10-24
+# Changelog v1.10.0: Automatic (night), configurable +10-point target offset,
+# persistent last automatic mode and timer return to that mode.
+# Changelog v1.9.0: CO2 fallback only after grace, including all-sensor outages.
+# With no valid readings during grace, hold the last published demand.
+# Changelog v1.8.0: dedicated ventilation_demand_fallback=50 for immediate
+# all-CO2-invalid and grace-expired CO2 fallback. Humidity behaviour unchanged.
+# Changelog v1.7.0: per-sensor CO2 outage grace period (default 300 seconds);
+# historical v1.7 behaviour: all-invalid bypassed grace; v1.9 removes this.
+# Changelog v1.6.0: shared ventilation_ramp_up/down constants replace fixed
+# ramp steps. Defaults remain +5/-2 percentage points per controller update.
+# Changelog v1.5.0: four shared ventilation-demand constants replace curve,
+# manual, humidity-boost, fallback and last-command helper demand values.
+# Changelog v1.4.1: write curve percentage spans as (50 - 5), (75 - 50),
+# and (100 - 75) for readability; no control behaviour changes.
+# Changelog v1.4.0: one shared constants block for CO2/humidity limits and
+# setpoints; interpolation intervals derive from the CO2 setpoints.
+# Changelog v1.3.0: require humidity below 75% for 5 continuous minutes
+# before releasing humidity boost. Activation and manual priority unchanged.
+# Changelog v1.2.0: manual priority selector, 10/20/30-minute HA boosts,
+# restored deadlines and expiry recovery after restart. Retains v1.1.0 features.
+# Changelog v1.1.0: Sonoff humidity override with 10s activation / 30s release;
+# restored boost latch; immediate 100% request; one MQTT command publisher.
+# Download filename: itho_co2_auto_v1.10.0.yaml
+# INSTALL using the stable filename /config/packages/itho_co2_auto.yaml.
+# Replace the old file; never install both versions in the packages directory.
+#
+# Home Assistant PACKAGE: /config/packages/itho_co2_auto.yaml
+# configuration.yaml must contain (merge into an existing homeassistant block):
+# homeassistant:
+#   packages: !include_dir_named packages
+#
+# EXISTING WORKING INSTALLATION
+# Reuses your installed Itho integration, its existing CO2 sensor entities,
+# the existing Mosquitto broker and the configured HA MQTT integration.
+# Does NOT install/reconfigure an integration, create duplicate MQTT sensors,
+# publish discovery messages, change broker credentials or change base topics.
+#
+# THREE LOCAL SETTINGS TO EDIT:
+# A. In group.itho_co2_sources below, replace example sensor IDs with ALL
+#    existing CO2 entities supplied by your installed integration.
+#    Find IDs in Developer Tools > States or the integration's device page.
+# B. In automation variables below, set mqtt_command_topic to the EXISTING
+#    command topic: your add-on's MQTT base topic followed by /cmd.
+#    Example: base ithohru => ithohru/cmd; base itho => itho/cmd.
+#    Read the existing setting in the add-on; do not change that setting.
+#
+# C. Set input_text.itho_humidity_source.initial below to your existing
+#    humidity entity ID. It must report relative humidity in percent.
+#
+# MANUAL CONTROL:
+# Add input_select.itho_control_mode to an Entities dashboard card.
+# Automatic => humidity first, otherwise CO2. Low=>5%, Medium=>50%, High=>100%.
+# Timer 10/20/30 =>100% for that many minutes, then the remembered automatic mode.
+# Manual selections bypass the ramp, humidity demand and CO2 fallback.
+# Manual Low/Medium/High hold until you select Automatic. HA-managed timers
+# restore their original deadline after restart, without restarting the duration.
+# Select Automatic to cancel. To restart the same timer, select Automatic first.
+# Uses percentage demand; these labels are NOT native HRU mode/timer commands.
+# The RF demand control continues to use Auto; manual refers to demand priority.
+# Existing fan presets and physical remote actions do NOT set this selector.
+# Keep using this selector for coordinated overrides.
+# Automatic (night) has the same priority/logic as Automatic. Its CO2 target
+# and grace-expired fallback floor receive ventilation_night_offset points,
+# capped at ventilation_demand_highest. Default +10 means 50% becomes 60%.
+# The offset is applied before ramping and never added repeatedly to a held
+# last-demand value during an all-CO2-missing grace period. Humidity still
+# requests ventilation_demand_highest; manual presets are not offset.
+# This is an HA mode, not the HRU's native Auto-Night preset.
+# Automatic (night) stays selected; only explicit selection changes it.
+# Manual timers return to the remembered automatic mode, including after restart.
+# Keep ventilation_night_offset >=0, in multiples of 0.5.
+# Selecting either automatic mode resumes from the last published demand; humidity
+# boost requests 100% immediately, otherwise the regular CO2 ramp applies.
+# Change curve setpoints in the SHARED CONSTANTS block under template below.
+# The default mid anchor is 850ppm=>50%; change ppm_mid_setpoint to 700 for 700ppm.
+# Keep: ppm_lower_bound <= ppm_low_setpoint < ppm_mid_setpoint
+#       < ppm_high_setpoint < ppm_highest_setpoint <= ppm_upper_bound.
+# Keep: humidity_lower_bound <= humidity_threshold <= humidity_upper_bound.
+# YAML anchors share the constants within this file: edit their definitions once.
+# Restart Home Assistant after changing constants to update every consumer.
+# Demand constants represent ventilation percentages; delays and ramp steps
+# are independent. Keep: 0 <= ventilation_demand_low <= ventilation_demand_mid
+# <= ventilation_demand_high <= ventilation_demand_highest <= 100.
+# Manual Low uses demand_low, Medium uses demand_mid, High/timers and humidity
+# use demand_highest. Missing CO2 fallback uses ventilation_demand_fallback.
+# ventilation_ramp_up/down are positive percentage-point changes per controller
+# update (normally every 10 seconds); they are not demand targets.
+# Defaults: ventilation_ramp_up=5 and ventilation_ramp_down=2.
+# Keep both positive and in multiples of 0.5, matching demand resolution.
+# Manual selections, humidity activation and missing-CO2 fallback still bypass
+# the ordinary ramp as before. Event-triggered controller runs also apply it.
+#
+# HUMIDITY BEHAVIOUR:
+# >75% continuously for 10s => boost ON, immediate demand=100% (no upward ramp).
+# <75% continuously for 5 minutes => boost OFF, ramp down to the current CO2 target.
+# Exactly 75% => retain boost state and reset both qualification periods.
+# Invalid/unavailable humidity => reset qualification periods and retain latch.
+# During missing data, existing boost stays ON; otherwise CO2 control continues.
+# A persistent notification reports missing/invalid humidity (outside 0..100%).
+# Boost latch restores after HA restarts. Qualification periods restart from zero
+# on HA restart/template reload; downtime is never counted as valid humidity.
+# Restored boost is published at startup/next 10s tick. A new qualifying boost
+# triggers the same publisher immediately. No separate humidity speed writer.
+# Source updates must actually reach HA; a frozen numeric reading is not detected.
+#
+# INSTALL:
+# Save this file to /config/packages/itho_co2_auto.yaml and merge the package
+# include shown above into configuration.yaml. If packages are already enabled
+# with !include_dir_named packages, no configuration.yaml change is needed.
+# Check configuration, then restart HA. This file is a PACKAGE, not a single
+# automation: do not paste the whole file into the automation UI editor.
+# Disable any OTHER automations that issue ventilation speed/mode commands.
+# Keep the existing integration and its sensor entities enabled.
+#
+# CONTROL CAPABILITY CHECK (no need to repeat if already working):
+# A working out-of-box integration does not by itself confirm RF demand control.
+# In the add-on verify firmware >=3.1.4 and control interface RF CO2 (demand
+# slider), using an emulated RFT CO2 SEND remote already joined to the HRU.
+# Physical sensors paired to the add-on are the separate RECEIVE side.
+# Keep status polling enabled. In Auto, confirm the web demand slider changes
+# the actual fan response BOTH upwards and downwards. If that works, leave
+# the existing RF pairing and settings alone. Otherwise complete that RF
+# demand setup first; ordinary Low/Medium/High preset control is insufficient.
+# The automation intentionally publishes percentage to the existing MQTT topic,
+# avoiding assumptions about which fan/number services your integration exposes.
+#
+# This commands RF VENTILATION DEMAND, not a calibrated percentage of motor RPM
+# or airflow. The HRU's minimum airflow and protective controls still apply.
+# The firmware's RF percentage handler selects Auto only when necessary.
+# No repeated separate Auto command is sent: that caused downward-demand issues
+# in older firmware. Other remotes can change mode between control ticks.
+#
+# Normal curve: <=500 ppm:5%; 850:50%; 1000:75%; >=1100:100%.
+# Linear interpolation between anchors, rounded to 0.5 percentage points.
+# Ramp every 10 sec: +5 points maximum, -2 points maximum.
+# Re-publish every tick, including at equilibrium, as RF demand keep-alive.
+# input_number is LAST PUBLISHED DEMAND, NOT confirmation of physical fan speed.
+# It initializes to ventilation_demand_fallback; its unavailable-value fallback
+# uses the same constant. Keep demand_low <= demand_fallback <= demand_highest.
+# During Automatic, partial CO2 outages use remaining valid sensors during
+# co2_sensor_grace_period_seconds (default 300). Each sensor has its own clock.
+# A continuously missing/invalid sensor past that period triggers demand_fallback
+# minimum fallback (50% by default); valid readings may require more.
+# All missing/invalid readings also wait for grace: hold last published demand
+# until a sensor's continuous outage expires. Manual priority is unchanged.
+# A valid reading clears only that sensor's outage clock. Unknown/unavailable/
+# out-of-range transitions do not reset a continuously invalid sensor's clock.
+# On HA restart partial-outage grace clocks restart; downtime is not counted.
+# Fallback is re-evaluated every 10s (may engage up to one update after expiry).
+# A notification is shown while fallback is required, then dismissed.
+# Plausible range: 250..20000 ppm. This cannot detect a frozen but numeric value;
+# configure source sensor availability/expiry if your integration supports it.
+# No HA automation can run while HA, MQTT, or the add-on is offline.
+
+group:
+  itho_co2_sources:
+    name: Itho CO2 sources
+    entities:
+      - sensor.co2_living_room
+      - sensor.co2_bedroom
+      - sensor.co2_study
+
+input_select:
+  itho_control_mode:
+    name: Itho ventilation control
+    icon: mdi:fan
+    options:
+      - Automatic
+      - Automatic (night)
+      - Low
+      - Medium
+      - High
+      - Timer 10
+      - Timer 20
+      - Timer 30
+    # Restore prior selection; first installation defaults to Automatic.
+
+  itho_last_automatic_mode:
+    name: Itho last automatic mode
+    icon: mdi:history
+    options:
+      - Automatic
+      - Automatic (night)
+    # Internal memory: no initial value, so restored after restart.
+    # Use itho_control_mode for everyday control.
+
+input_datetime:
+  itho_manual_override_until:
+    name: Itho manual override until
+    has_date: true
+    has_time: true
+    # No initial value: preserve the absolute timer deadline across restarts.
+
+input_text:
+  itho_humidity_source:
+    name: Itho humidity source entity
+    initial: sensor.humidity_bathroom
+    max: 255
+
+input_boolean:
+  itho_humidity_boost:
+    name: Itho humidity boost
+    icon: mdi:water-percent
+    # No initial value: HA restores the latch from its previous state.
+
+template:
+  # SHARED CONSTANTS — edit these values only.
+  # Reused by both template blocks and the main automation via YAML aliases.
+  - variables: &itho_control_constants
+      ppm_lower_bound: 250
+      ppm_upper_bound: 20000
+      ppm_low_setpoint: 500
+      ppm_mid_setpoint: 850
+      ppm_high_setpoint: 1000
+      ppm_highest_setpoint: 1100
+      humidity_threshold: 75
+      humidity_lower_bound: 0
+      humidity_upper_bound: 100
+      ventilation_demand_low: &ventilation_demand_low 5
+      ventilation_demand_mid: 50
+      ventilation_demand_high: &ventilation_demand_high 75
+      ventilation_demand_highest: &ventilation_demand_highest 100
+      ventilation_ramp_up: 7.5
+      ventilation_ramp_down: 2
+      ventilation_night_offset: 10
+      co2_sensor_grace_period_seconds: 300
+      ventilation_demand_fallback: &ventilation_demand_fallback 50
+    sensor:
+      - name: co2highestvalue
+        unique_id: itho_co2_highest_value
+        unit_of_measurement: ppm
+        device_class: carbon_dioxide
+        state_class: measurement
+        availability: >-
+          {% set ns = namespace(values=[]) %}
+          {% for entity in state_attr('group.itho_co2_sources', 'entity_id') or [] %}
+            {% set v = states(entity) | float(-1) %}
+            {% if ppm_lower_bound <= v <= ppm_upper_bound %}
+              {% set ns.values = ns.values + [v] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.values | count > 0 }}
+        state: >-
+          {% set ns = namespace(values=[]) %}
+          {% for entity in state_attr('group.itho_co2_sources', 'entity_id') or [] %}
+            {% set v = states(entity) | float(-1) %}
+            {% if ppm_lower_bound <= v <= ppm_upper_bound %}
+              {% set ns.values = ns.values + [v] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.values | max if ns.values else none }}
+
+  - variables: *itho_control_constants
+    binary_sensor:
+      - name: Itho humidity above threshold for 10 seconds
+        default_entity_id: binary_sensor.itho_humidity_above_75_for_10_seconds
+        unique_id: itho_humidity_above_75_for_10_seconds
+        delay_on:
+          seconds: 10
+        state: >-
+          {% set h = states(states('input_text.itho_humidity_source')) | float(-1) %}
+          {{ humidity_lower_bound <= h <= humidity_upper_bound and h > humidity_threshold }}
+      - name: Itho humidity below threshold for 5 minutes
+        # Preserve the original entity identity for existing installations.
+        default_entity_id: binary_sensor.itho_humidity_below_75_for_30_seconds
+        unique_id: itho_humidity_below_75_for_30_seconds
+        delay_on:
+          minutes: 15
+        state: >-
+          {% set h = states(states('input_text.itho_humidity_source')) | float(-1) %}
+          {{ humidity_lower_bound <= h <= humidity_upper_bound and h < humidity_threshold }}
+      - name: Itho humidity data valid
+        unique_id: itho_humidity_data_valid
+        state: >-
+          {% set h = states(states('input_text.itho_humidity_source')) | float(-1) %}
+          {{ humidity_lower_bound <= h <= humidity_upper_bound }}
+
+
+  # Track independent outage start timestamps; no input_text size limit.
+  - variables: *itho_control_constants
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: event
+        event_type: state_changed
+      - trigger: time_pattern
+        seconds: /10
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.platform != 'event'
+             or trigger.event.data.entity_id == 'group.itho_co2_sources'
+             or trigger.event.data.entity_id in
+               (state_attr('group.itho_co2_sources', 'entity_id') or []) }}
+    sensor:
+      - name: Itho CO2 unavailable sensors
+        default_entity_id: sensor.itho_co2_unavailable_sensors
+        unique_id: itho_co2_unavailable_sensors
+        icon: mdi:cloud-alert
+        state: >-
+          {% set ns = namespace(count=0) %}
+          {% for entity in state_attr('group.itho_co2_sources', 'entity_id') or [] %}
+            {% set v = states(entity) | float(-1) %}
+            {% if not (ppm_lower_bound <= v <= ppm_upper_bound) %}
+              {% set ns.count = ns.count + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.count }}
+        attributes:
+          unavailable_since: >-
+            {% set previous = this.attributes.unavailable_since | default({}, true) %}
+            {% if trigger.platform == 'homeassistant' %}
+              {% set previous = {} %}
+            {% endif %}
+            {% set ns = namespace(pairs=[]) %}
+            {% set time_now = as_timestamp(now()) %}
+            {% for entity in state_attr('group.itho_co2_sources', 'entity_id') or [] %}
+              {% set v = states(entity) | float(-1) %}
+              {% if not (ppm_lower_bound <= v <= ppm_upper_bound) %}
+                {% set since = previous.get(entity, time_now) %}
+                {% set ns.pairs = ns.pairs + [(entity, since)] %}
+              {% endif %}
+            {% endfor %}
+            {% if (state_attr('group.itho_co2_sources', 'entity_id') or []) | count == 0 %}
+              {% set ns.pairs = [('__no_co2_sources__',
+                                 previous.get('__no_co2_sources__', time_now))] %}
+            {% endif %}
+            {{ dict(ns.pairs) }}
+
+input_number:
+  itho_co2_last_command:
+    name: Itho CO2 last published demand
+    min: *ventilation_demand_low
+    max: *ventilation_demand_highest
+    step: 0.5
+    initial: *ventilation_demand_fallback
+    unit_of_measurement: "%"
+    mode: box
+    icon: mdi:fan
+
+automation:
+  # This automation changes ONLY the boost latch; it never writes fan demand.
+  - id: itho_humidity_boost_latch
+    alias: Itho humidity - boost latch
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.itho_humidity_above_75_for_10_seconds
+        to: "on"
+        id: humid
+      - trigger: state
+        entity_id: binary_sensor.itho_humidity_below_75_for_30_seconds
+        to: "on"
+        id: dry
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: humid
+              - condition: state
+                entity_id: binary_sensor.itho_humidity_above_75_for_10_seconds
+                state: "on"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.itho_humidity_boost
+          - conditions:
+              - condition: trigger
+                id: dry
+              - condition: state
+                entity_id: binary_sensor.itho_humidity_below_75_for_30_seconds
+                state: "on"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.itho_humidity_boost
+
+  - id: itho_co2_auto_continuous_control
+    alias: Itho CO2 and humidity - continuous demand in Auto
+    description: v1.10.0 - Manual priority, timed boosts, humidity override and CO2 curve
+    variables:
+      <<: *itho_control_constants
+      # EDIT: existing add-on command topic; do not change the add-on base topic.
+      mqtt_command_topic: "ithohru/cmd"
+    mode: queued
+    max: 10
+    max_exceeded: silent
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        seconds: /10
+      - trigger: state
+        entity_id: input_boolean.itho_humidity_boost
+        to: "on"
+      - trigger: state
+        entity_id: input_boolean.itho_humidity_boost
+        to: "off"
+      - trigger: state
+        entity_id: input_select.itho_control_mode
+        id: manual_selection
+      - trigger: time
+        at: input_datetime.itho_manual_override_until
+        id: manual_deadline
+      - trigger: state
+        entity_id: sensor.itho_co2_unavailable_sensors
+        id: co2_availability
+    actions:
+      # Remember explicit automatic selections even if a manual command follows
+      # before this queued controller run starts. Also sync restored night mode.
+      - variables:
+          automatic_mode_to_remember: >-
+            {% set modes = ['Automatic', 'Automatic (night)'] %}
+            {% if trigger is defined
+                  and trigger.id | default('') == 'manual_selection'
+                  and trigger.to_state is not none
+                  and trigger.to_state.state in modes %}
+              {{ trigger.to_state.state }}
+            {% elif states('input_select.itho_control_mode') in modes %}
+              {{ states('input_select.itho_control_mode') }}
+            {% else %}
+              {{ states('input_select.itho_last_automatic_mode') }}
+            {% endif %}
+      - if:
+          - condition: template
+            value_template: >-
+              {{ automatic_mode_to_remember in ['Automatic', 'Automatic (night)']
+                 and automatic_mode_to_remember !=
+                   states('input_select.itho_last_automatic_mode') }}
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.itho_last_automatic_mode
+            data:
+              option: "{{ automatic_mode_to_remember }}"
+      # Only a real selection change starts a new timer, never state restoration.
+      - if:
+          - condition: template
+            value_template: >-
+              {{ trigger is defined
+                 and trigger.id | default('') == 'manual_selection'
+                 and trigger.from_state is not none
+                 and trigger.to_state is not none
+                 and trigger.from_state.state not in ['unknown', 'unavailable']
+                 and trigger.from_state.state != trigger.to_state.state
+                 and trigger.to_state.state in
+                   ['Timer 10', 'Timer 20', 'Timer 30']
+                 and states('input_select.itho_control_mode') ==
+                   trigger.to_state.state }}
+        then:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.itho_manual_override_until
+            data:
+              timestamp: >-
+                {% set minutes = trigger.to_state.state.split()[-1] | int %}
+                {{ as_timestamp(trigger.to_state.last_changed) + minutes * 60 }}
+      # Check expired deadlines on startup/tick as well as the exact time trigger.
+      # A 2s grace on periodic ticks prevents a simultaneous selection/tick race
+      # from expiring the previous deadline before its selection event runs.
+      - if:
+          - condition: template
+            value_template: >-
+              {{ states('input_select.itho_control_mode') in
+                   ['Timer 10', 'Timer 20', 'Timer 30']
+                 and
+                 (state_attr('input_datetime.itho_manual_override_until',
+                             'timestamp') | float(0))
+                   <= as_timestamp(now())
+                 and (trigger is not defined
+                   or trigger.platform | default('') != 'time_pattern'
+                   or as_timestamp(now()) -
+                     as_timestamp(states.input_select.itho_control_mode.last_changed)
+                     >= 2) }}
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.itho_control_mode
+            data:
+              option: >-
+                {% set remembered = states('input_select.itho_last_automatic_mode') %}
+                {{ remembered if remembered in ['Automatic', 'Automatic (night)']
+                   else 'Automatic' }}
+      # Read raw source entities in the SAME tick, avoiding template update races.
+      - variables:
+          source_entities: "{{ state_attr('group.itho_co2_sources', 'entity_id') or [] }}"
+      - variables:
+          valid_values: >-
+            {% set ns = namespace(values=[]) %}
+            {% for entity in source_entities %}
+              {% set v = states(entity) | float(-1) %}
+              {% if ppm_lower_bound <= v <= ppm_upper_bound %}
+                {% set ns.values = ns.values + [v] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.values }}
+      - variables:
+          highest: "{{ valid_values | max if valid_values else 0 }}"
+          data_problem: >-
+            {% set since = state_attr('sensor.itho_co2_unavailable_sensors',
+                                      'unavailable_since') or {} %}
+            {% if trigger is defined and trigger.platform | default('') == 'homeassistant' %}
+              {% set since = {} %}
+            {% endif %}
+            {% set time_now = as_timestamp(now()) %}
+            {% set ns = namespace(overdue=false) %}
+            {% for entity in source_entities %}
+              {% set v = states(entity) | float(-1) %}
+              {% if not (ppm_lower_bound <= v <= ppm_upper_bound) %}
+                {% set started = since.get(entity, time_now) | float(time_now) %}
+                {% if time_now - started >= co2_sensor_grace_period_seconds %}
+                  {% set ns.overdue = true %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% if source_entities | count == 0 %}
+              {% set started = since.get('__no_co2_sources__', time_now) | float(time_now) %}
+              {% if time_now - started >= co2_sensor_grace_period_seconds %}
+                {% set ns.overdue = true %}
+              {% endif %}
+            {% endif %}
+            {{ ns.overdue }}
+      - variables:
+          curve_demand: >-
+            {% set c = highest | float(0) %}
+            {% if c <= ppm_low_setpoint %}
+              {% set p = ventilation_demand_low %}
+            {% elif c <= ppm_mid_setpoint %}
+              {% set p = ventilation_demand_low + (c - ppm_low_setpoint) *
+                (ventilation_demand_mid - ventilation_demand_low) /
+                (ppm_mid_setpoint - ppm_low_setpoint) %}
+            {% elif c <= ppm_high_setpoint %}
+              {% set p = ventilation_demand_mid + (c - ppm_mid_setpoint) *
+                (ventilation_demand_high - ventilation_demand_mid) /
+                (ppm_high_setpoint - ppm_mid_setpoint) %}
+            {% elif c < ppm_highest_setpoint %}
+              {% set p = ventilation_demand_high + (c - ppm_high_setpoint) *
+                (ventilation_demand_highest - ventilation_demand_high) /
+                (ppm_highest_setpoint - ppm_high_setpoint) %}
+            {% else %}
+              {% set p = ventilation_demand_highest %}
+            {% endif %}
+            {{ ((p * 2) | round(0)) / 2 }}
+      - variables:
+          base_target_demand: >-
+            {% if data_problem %}
+              {{ [ventilation_demand_fallback, curve_demand | float] | max }}
+            {% elif valid_values | count == 0 %}
+              {{ states('input_number.itho_co2_last_command') | float(ventilation_demand_fallback) }}
+            {% else %}
+              {{ curve_demand | float }}
+            {% endif %}
+          previous_demand: "{{ states('input_number.itho_co2_last_command') | float(ventilation_demand_fallback) }}"
+      - variables:
+          automatic_offset: >-
+            {{ ventilation_night_offset
+               if is_state('input_select.itho_control_mode', 'Automatic (night)')
+               else 0 }}
+      - variables:
+          effective_fallback_demand: >-
+            {{ [ventilation_demand_highest,
+                ventilation_demand_fallback + automatic_offset | float] | min }}
+          target_demand: >-
+            {% if valid_values | count == 0 and not data_problem %}
+              {{ base_target_demand | float }}
+            {% else %}
+              {{ [ventilation_demand_highest,
+                  (base_target_demand | float) + (automatic_offset | float)] | min }}
+            {% endif %}
+      - variables:
+          next_demand: >-
+            {% set p = previous_demand | float %}
+            {% set t = target_demand | float %}
+            {% set manual = states('input_select.itho_control_mode') %}
+            {% if manual == 'Low' %}
+              {{ ventilation_demand_low }}
+            {% elif manual == 'Medium' %}
+              {{ ventilation_demand_mid }}
+            {% elif manual in ['High', 'Timer 10', 'Timer 20', 'Timer 30'] %}
+              {{ ventilation_demand_highest }}
+            {% elif is_state('input_boolean.itho_humidity_boost', 'on') %}
+              {{ ventilation_demand_highest }}
+            {% elif data_problem and p < effective_fallback_demand %}
+              {{ effective_fallback_demand }}
+            {% elif t > p %}
+              {{ [t, p + ventilation_ramp_up] | min }}
+            {% else %}
+              {{ [t, p - ventilation_ramp_down] | max }}
+            {% endif %}
+      - action: mqtt.publish
+        data:
+          topic: "{{ mqtt_command_topic }}"
+          qos: 0
+          retain: false
+          payload: "{{ {'percentage': next_demand | float} | to_json }}"
+      # Store only after successful publication. MQTT success is not RF ACK.
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.itho_co2_last_command
+        data:
+          value: "{{ next_demand | float }}"
+      - if:
+          - condition: template
+            value_template: "{{ data_problem }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: itho_co2_data_problem
+              title: Itho CO2 sensor data missing
+              message: >-
+                At least one CO2 sensor, or the configured source list itself,
+                has remained missing/invalid for
+                {{ co2_sensor_grace_period_seconds }} seconds. Valid CO2 range:
+                {{ ppm_lower_bound }}..{{ ppm_upper_bound }} ppm.
+                Automatic CO2 control uses at least {{ ventilation_demand_fallback }}%
+                while this condition persists; higher valid CO2 demand is respected.
+                Manual selections take priority. Check group.itho_co2_sources
+                and the physical sensors. MQTT publication does not confirm RF delivery.
+        else:
+          - action: persistent_notification.dismiss
+            data:
+              notification_id: itho_co2_data_problem
+      - if:
+          - condition: template
+            value_template: >-
+              {% set h = states(states('input_text.itho_humidity_source')) | float(-1) %}
+              {{ not (humidity_lower_bound <= h <= humidity_upper_bound) }}
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: itho_humidity_data_problem
+              title: Itho humidity sensor data missing
+              message: >-
+                The configured humidity sensor is missing, unavailable or outside
+                {{ humidity_lower_bound }}..{{ humidity_upper_bound }}%. Check input_text.itho_humidity_source and your Sonoff.
+                In Automatic, an active humidity boost remains at {{ ventilation_demand_highest }}%; otherwise
+                CO2 control continues. Manual selections take priority. Fresh qualifying humidity readings are required
+                before the boost can be activated or released.
+        else:
+          - action: persistent_notification.dismiss
+            data:
+              notification_id: itho_humidity_data_problem
+
