@@ -44,6 +44,7 @@ I've been using this at home for some time now without any problems. My setup is
 
 > [!CAUTION]
 > If you do have sensors/remotes from Itho Daalderop, the automation assumes **all those sensors/remotes are joined with the WiFi add-on only**. This is because the automation takes over handling ventilation demand from the heat exchangers built-in handling. If a sensor/remote is still connected to the heat exchanger and changes the ventilation demand, **the automation will NOT be aware of that** and this may lead to unwanted behavior of the heat exchanger. All sensors/remotes include: CO2/humidity sensors, Spider, physical remotes to set timers/auto/low/med/high modes and so on.
+>
 > Recommended setup is to only have a CO2 RF device (see step 4 below) be paired with the heat exchanger as the current automation cannot handle remotes that are joined to the add-on and influence ventilation demand. This is work in progress.
 
 
